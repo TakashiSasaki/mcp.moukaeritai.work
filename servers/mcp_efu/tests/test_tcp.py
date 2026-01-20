@@ -51,7 +51,7 @@ class TestTcpServerMode(unittest.TestCase):
             encoding='utf-8'
         )
         # Wait for the server to start
-        time.sleep(1) 
+        time.sleep(0.5) 
 
     def tearDown(self):
         """Remove temp directory and terminate server process."""
@@ -71,11 +71,38 @@ class TestTcpServerMode(unittest.TestCase):
             print(f"TCP Server Stderr:\n{stderr_output}", file=sys.stderr)
 
 
+    def _read_and_validate_server_hello(self, f):
+        response_line = f.readline()
+        self.assertTrue(response_line, "Server did not send the server/hello notification.")
+        
+        response = json.loads(response_line)
+
+        self.assertEqual(response.get("jsonrpc"), "2.0")
+        self.assertEqual(response.get("method"), "server/hello")
+        self.assertIn("params", response)
+        params = response.get("params", {})
+        self.assertEqual(params.get("displayName"), "EFU File Lister")
+        return response
+
+    def test_tcp_server_hello_notification(self):
+        """Test that the server sends a server/hello notification on connect over TCP."""
+        try:
+            with socket.create_connection((self.host, self.port), timeout=5) as sock:
+                with sock.makefile('r', encoding='utf-8') as f:
+                    self._read_and_validate_server_hello(f)
+        except ConnectionRefusedError:
+            self.fail("Could not connect to the TCP server.")
+        except Exception as e:
+            self.fail(f"An exception occurred: {e}")
+
     def test_tcp_get_file_list_success(self):
         """Test a successful get_file_list request over TCP."""
         try:
             with socket.create_connection((self.host, self.port), timeout=5) as sock:
                 with sock.makefile('rw', encoding='utf-8') as f:
+                    # Read and validate server/hello
+                    self._read_and_validate_server_hello(f)
+
                     request = {
                         "jsonrpc": "2.0",
                         "method": "get_file_list",
@@ -115,6 +142,9 @@ class TestTcpServerMode(unittest.TestCase):
         try:
             with socket.create_connection((self.host, self.port), timeout=3) as sock:
                 with sock.makefile('rw', encoding='utf-8') as f:
+                    # Read and validate server/hello
+                    self._read_and_validate_server_hello(f)
+
                     request = {
                         "jsonrpc": "2.0",
                         "method": "get_file_list",
@@ -143,6 +173,35 @@ class TestTcpServerMode(unittest.TestCase):
                     self.assertIn("is not a valid directory", error.get("message"))
         except ConnectionRefusedError:
             self.fail("Could not connect to the TCP server. Is it running?")
+
+    def test_tcp_tools_list(self):
+        """Test a successful tools/list request over TCP."""
+        try:
+            with socket.create_connection((self.host, self.port), timeout=3) as sock:
+                with sock.makefile('rw', encoding='utf-8') as f:
+                    # Read and validate server/hello
+                    self._read_and_validate_server_hello(f)
+
+                    request = {
+                        "jsonrpc": "2.0",
+                        "method": "tools/list",
+                        "id": "tools-list-tcp-1"
+                    }
+                    
+                    f.write(json.dumps(request) + '\n')
+                    f.flush()
+
+                    response_line = f.readline()
+                    self.assertTrue(response_line, "Server did not respond.")
+                    
+                    response = json.loads(response_line)
+                    self.assertEqual(response.get("id"), "tools-list-tcp-1")
+                    self.assertIn("result", response)
+                    self.assertIn("tools", response["result"])
+                    self.assertEqual(len(response["result"]["tools"]), 1)
+        except ConnectionRefusedError:
+            self.fail("Could not connect to the TCP server. Is it running?")
+
 
 if __name__ == "__main__":
     unittest.main()

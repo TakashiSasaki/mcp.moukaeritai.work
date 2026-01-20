@@ -69,8 +69,8 @@ class TestStdioServerMode(unittest.TestCase):
             encoding='utf-8'
         )
 
-        # Give the server a moment to start
-        time.sleep(0.5)
+        # Read and discard the server/hello notification
+        self.server_process.stdout.readline()
 
         request = {
             "jsonrpc": "2.0",
@@ -113,8 +113,8 @@ class TestStdioServerMode(unittest.TestCase):
             encoding='utf-8'
         )
         
-        # Give the server a moment to start
-        time.sleep(0.5)
+        # Read and discard the server/hello notification
+        self.server_process.stdout.readline()
 
         request = {
             "jsonrpc": "2.0",
@@ -142,6 +142,89 @@ class TestStdioServerMode(unittest.TestCase):
         error = response["error"]
         self.assertEqual(error.get("code"), -32000)
         self.assertIn("is not a valid directory", error.get("message"))
+
+    def test_stdio_tools_list(self):
+        """Test a successful tools/list request over stdio."""
+        self.server_process = subprocess.Popen(
+            self.command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8'
+        )
+
+        # Read and discard the server/hello notification
+        self.server_process.stdout.readline()
+
+        request = {
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": "tools-list-1"
+        }
+        
+        # Send request
+        self.server_process.stdin.write(json.dumps(request) + '\n')
+        self.server_process.stdin.flush()
+
+        # Read response
+        response_line = self.server_process.stdout.readline()
+        self.assertTrue(response_line, "Server did not respond.")
+        
+        response = json.loads(response_line)
+
+        # Assertions
+        self.assertEqual(response.get("jsonrpc"), "2.0")
+        self.assertEqual(response.get("id"), "tools-list-1")
+        self.assertIn("result", response)
+        
+        result = response["result"]
+        self.assertIn("tools", result)
+        tools = result["tools"]
+        self.assertIsInstance(tools, list)
+        self.assertEqual(len(tools), 1)
+
+        tool = tools[0]
+        self.assertEqual(tool["name"], "get_file_list")
+        self.assertIn("指定されたパス内のファイルとディレクトリの一覧を取得します。", tool["description"])
+        
+        input_schema = tool["inputSchema"]
+        self.assertEqual(input_schema["type"], "object")
+        self.assertIn("path", input_schema["properties"])
+        self.assertEqual(input_schema["properties"]["path"]["type"], "string")
+        self.assertEqual(input_schema["required"], ["path"])
+
+    def test_stdio_server_hello_notification(self):
+        """Test that the server sends a server/hello notification on connect."""
+        self.server_process = subprocess.Popen(
+            self.command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8'
+        )
+
+        # The server should immediately send a `server/hello` notification.
+        # We should be able to read it without sending any request.
+        response_line = self.server_process.stdout.readline()
+        self.assertTrue(response_line, "Server did not send the server/hello notification.")
+        
+        response = json.loads(response_line)
+
+        # Assertions for server/hello notification
+        self.assertEqual(response.get("jsonrpc"), "2.0")
+        self.assertEqual(response.get("method"), "server/hello")
+        self.assertNotIn("id", response)  # Notifications must not have an id
+
+        params = response.get("params", {})
+        self.assertEqual(params.get("displayName"), "EFU File Lister")
+        self.assertIn("tools", params)
+        
+        tools = params["tools"]
+        self.assertIsInstance(tools, list)
+        self.assertEqual(len(tools), 1)
+        self.assertEqual(tools[0]["name"], "get_file_list")
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@
 import asyncio
 import sys
 import json
+import time
 from .core import EfuFileManager
 
 def create_success_response(req_id, result):
@@ -26,8 +27,40 @@ async def handle_connection(
     Generic handler for a connection (TCP or stdio).
     It reads line-by-line JSON-RPC requests and writes back JSON-RPC responses.
     """
-    print(f"Connection established from {peer_name}", file=sys.stderr)
+    print(f"[{time.time()}] Connection established from {peer_name}", file=sys.stderr)
     try:
+        # Define the tools provided by this server
+        tools = [
+            {
+                "name": "get_file_list",
+                "description": "指定されたパス内のファイルとディレクトリの一覧を取得します。",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "スキャンするルートパス"
+                        }
+                    },
+                    "required": ["path"]
+                }
+            }
+        ]
+
+        # Send server/hello notification upon connection
+        hello_notification = {
+            "jsonrpc": "2.0",
+            "method": "server/hello",
+            "params": {
+                "version": "0.1.0",
+                "displayName": "EFU File Lister",
+                "tools": tools
+            }
+        }
+        print(f"[{time.time()}] RSP < {hello_notification}", file=sys.stderr)
+        writer.write((json.dumps(hello_notification) + '\n').encode())
+        await writer.drain()
+
         while not reader.at_eof():
             request_line = await reader.readline()
             if not request_line:
@@ -36,24 +69,38 @@ async def handle_connection(
             request_str = request_line.decode().strip()
             if not request_str:
                 continue
+            
+            print(f"[{time.time()}] RAW < {request_str}", file=sys.stderr)
 
             req_id = None
             try:
                 request = json.loads(request_str)
+                print(f"[{time.time()}] REQ > {request}", file=sys.stderr)
+
                 req_id = request.get("id")
                 method = request.get("method")
                 params = request.get("params")
 
-                if method == "get_file_list":
-                    if not isinstance(params, list) or len(params) != 1 or not isinstance(params[0], str):
-                        response = create_error_response(req_id, -32602, "Invalid params: Expected a list with one string [path].")
-                    else:
-                        root_path = params[0]
+                if method == "tools/list":
+                    response = create_success_response(req_id, {"tools": tools})
+
+                elif method == "get_file_list":
+                    path = None
+                    # Handle positional parameters: params: ["/path/to/scan"]
+                    if isinstance(params, list) and len(params) == 1 and isinstance(params[0], str):
+                        path = params[0]
+                    # Handle named parameters: params: {"path": "/path/to/scan"}
+                    elif isinstance(params, dict) and isinstance(params.get("path"), str):
+                        path = params.get("path")
+
+                    if path is not None:
                         try:
-                            file_list = efu_manager.get_file_list(root_path)
+                            file_list = efu_manager.get_file_list(path)
                             response = create_success_response(req_id, file_list)
                         except ValueError as e:
                             response = create_error_response(req_id, -32000, f"Server error: {e}")
+                    else:
+                        response = create_error_response(req_id, -32602, "Invalid params: Expected a list with one string [path] or an object {'path': '...'}.")
                 else:
                     response = create_error_response(req_id, -32601, f"Method not found: {method}")
 
@@ -62,6 +109,7 @@ async def handle_connection(
             except Exception as e:
                 response = create_error_response(req_id, -32603, f"Internal error: {e}")
 
+            print(f"[{time.time()}] RSP < {response}", file=sys.stderr)
             writer.write((json.dumps(response) + '\n').encode())
             await writer.drain()
 
