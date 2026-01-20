@@ -63,6 +63,8 @@ The MCP server exposes a single tool:
 
 - `get_file_list(path: str)`: Returns the EFU-compatible file list for the given path.
 
+See `METHODS.md` for a human-readable description of the tool, inputs, and outputs.
+
 ## Testing
 
 This project uses Python's built-in `unittest` framework. Tests are located in the `tests/` directory.
