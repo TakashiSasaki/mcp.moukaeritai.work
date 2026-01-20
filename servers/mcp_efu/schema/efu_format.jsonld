@@ -1,0 +1,55 @@
+{
+  "@context": {
+    "schema": "https://schema.org/",
+    "efu": "https://moukaeritai.work/schema/efu#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "efu:property": { "@type": "@id" },
+    "rdfs:label": "rdfs:label",
+    "rdfs:comment": "rdfs:comment",
+    "efu:isRequired": { "@type": "xsd:boolean" }
+  },
+  "@id": "efu:Format",
+  "@type": "rdfs:Class",
+  "rdfs:label": "EFU (Everything File List) Format",
+  "rdfs:comment": "Describes the fields available in the EFU file format, which is the conceptual basis for mcp_efu. This defines the universe of possible fields.",
+  "efu:property": [
+    {
+      "@id": "schema:name",
+      "rdfs:label": "Filename",
+      "rdfs:comment": "The name of the file or directory.",
+      "efu:isRequired": true
+    },
+    {
+      "@id": "schema:size",
+      "rdfs:label": "Size",
+      "rdfs:comment": "The size of the file in bytes.",
+      "efu:isRequired": false
+    },
+    {
+      "@id": "schema:dateModified",
+      "rdfs:label": "Date Modified",
+      "rdfs:comment": "The last modification date and time.",
+      "efu:isRequired": false
+    },
+    {
+      "@id": "schema:dateCreated",
+      "rdfs:label": "Date Created",
+      "rdfs:comment": "The creation date and time.",
+      "efu:isRequired": false
+    },
+    {
+       "@id": "efu:attributes",
+       "rdfs:label": "Attributes",
+       "rdfs:comment": "File attributes (e.g., Read-only, Hidden).",
+       "efu:isRequired": false
+    },
+    {
+        "@id": "schema:path",
+        "rdfs:label": "Path",
+        "rdfs:comment": "The full path to the file, excluding the filename.",
+        "efu:isRequired": false
+    }
+  ]
+}
