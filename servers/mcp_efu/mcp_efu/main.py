@@ -1,11 +1,10 @@
 # mcp_efu/main.py
 import argparse
-import asyncio
 import sys
 import json
 import os
 from .core import EfuFileManager
-from .transport import start_tcp_server, start_stdio_server
+from fastmcp import FastMCP
 
 def main():
     """
@@ -35,20 +34,9 @@ Examples:
     server_group = parser.add_argument_group('Server Mode Arguments')
     server_group.add_argument(
         "--transport",
-        choices=["stdio", "tcp"],
+        choices=["stdio", "sse", "streamable-http"],
         default=None,
-        help="Run as a server with the specified transport.\nstdio: Use standard input/output for communication.\ntcp: Use a TCP socket for communication."
-    )
-    server_group.add_argument(
-        "--host",
-        default="localhost",
-        help="Host for TCP server to listen on (default: localhost)."
-    )
-    server_group.add_argument(
-        "--port",
-        type=int,
-        default=8989,
-        help="Port for TCP server to listen on (default: 8989)."
+        help="Run as an MCP server with the specified transport.\nstdio: Use standard input/output.\nsse: Use Server-Sent Events.\nstreamable-http: Use streamable HTTP."
     )
 
     # CLI mode arguments
@@ -82,20 +70,19 @@ Examples:
             parser.error("Positional argument 'path' cannot be used with --transport. For server mode, path is provided in the JSONRPC request.")
 
         efu_manager = EfuFileManager()
-        print(f"Starting server with transport: {args.transport}", file=sys.stderr)
-        main_coroutine = None
-        if args.transport == "stdio":
-            main_coroutine = start_stdio_server(efu_manager)
-        elif args.transport == "tcp":
-            main_coroutine = start_tcp_server(args.host, args.port, efu_manager)
+        server = FastMCP(name="EFU File Lister", version="0.1.0")
 
-        if main_coroutine:
-            try:
-                asyncio.run(main_coroutine)
-            except KeyboardInterrupt:
-                print("\nServer shutting down gracefully.", file=sys.stderr)
-            except Exception as e:
-                print(f"\nAn unexpected server error occurred: {e}", file=sys.stderr)
+        @server.tool(description="指定されたパス内のファイルとディレクトリの一覧を取得します。")
+        def get_file_list(path: str) -> list[dict]:
+            return efu_manager.get_file_list(path)
+
+        print(f"Starting MCP server with transport: {args.transport}", file=sys.stderr)
+        try:
+            server.run(transport=args.transport)
+        except KeyboardInterrupt:
+            print("\nServer shutting down gracefully.", file=sys.stderr)
+        except Exception as e:
+            print(f"\nAn unexpected server error occurred: {e}", file=sys.stderr)
     
     elif args.path:
         # --- CLI Mode ---
