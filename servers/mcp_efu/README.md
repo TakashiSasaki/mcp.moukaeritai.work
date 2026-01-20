@@ -2,45 +2,47 @@
 
 `mcp_efu` is a server and command-line tool that generates file lists in a format compatible with the Everything File List (EFU). It can run as a persistent server communicating over TCP or stdio, or as a one-off command.
 
-## Usage
+## Modes of Operation
 
-This tool can be run directly using the Python module runner (`python -m`) without installation.
+`mcp_efu` can be run in three distinct modes depending on your needs.
 
-There are two main modes of operation: CLI Mode and Server Mode.
+### 1. CLI Mode (Command-Line Interface)
 
-### CLI Mode
+This mode is designed for direct, interactive use by a person in a terminal. It functions as a simple, one-off command to scan a directory and see the results immediately.
 
-This mode is for running a single scan and printing the results.
+*   **Function:** Scans a specified local directory path.
+*   **Output:** Prints a JSON-formatted list of file information to standard output.
+*   **Use Case:** Manually inspecting the contents of a directory or scripting simple file operations in a shell environment.
+*   **Example:**
+    ```bash
+    # Scan a directory and print to console
+    python -m servers.mcp_efu.mcp_efu.main /path/to/your/directory
 
-**To scan a directory and print results to the console:**
-```bash
-# Scan the current directory
-python -m servers.mcp_efu.mcp_efu.main .
+    # Scan and save the output to a file
+    python -m servers.mcp_efu.mcp_efu.main . --output file-list.json
+    ```
 
-# Scan a specific directory
-python -m servers.mcp_efu.mcp_efu.main /path/to/scan
-```
+### 2. STDIO Server Mode
 
-**To save the results to a file:**
-Use the `-o` or `--output` option.
-```bash
-python -m servers.mcp_efu.mcp_efu.main . --output my_file_list.json
-```
+This mode runs `mcp_efu` as a persistent server process that communicates over standard input (`stdin`) and standard output (`stdout`). It is designed for machine-to-machine communication, where one process controls another.
 
-### Server Mode
+*   **Function:** Listens for JSON-RPC 2.0 requests on `stdin` and sends responses to `stdout`. All log messages are sent to `stderr` to keep the data channel clean.
+*   **Use Case:** Integrating `mcp_efu` with another application on the same machine. For example, a parent Node.js or Python script could launch and communicate with this server to get file lists without using network sockets.
+*   **Example:**
+    ```bash
+    python -m servers.mcp_efu.mcp_efu.main --transport stdio
+    ```
 
-This mode runs a persistent server that accepts requests via a specified transport. All log messages are printed to `stderr` to keep `stdout` clean for data.
+### 3. TCP Server Mode
 
-**To start the server:**
-Use the `--transport` flag.
+This mode runs `mcp_efu` as a persistent network server that listens for connections on a TCP socket.
 
-```bash
-# Start a server listening on stdio
-python -m servers.mcp_efu.mcp_efu.main --transport stdio
-
-# Start a server listening on a TCP port
-python -m servers.mcp_efu.mcp_efu.main --transport tcp --host localhost --port 8989
-```
+*   **Function:** Listens for JSON-RPC 2.0 requests on a specified network port and sends responses back over the same socket. All log messages are sent to `stderr`.
+*   **Use Case:** Allowing applications on a local or remote network to connect and request file lists. This is the most flexible option for building a distributed system where a central application needs to query file information from multiple machines.
+*   **Example:**
+    ```bash
+    python -m servers.mcp_efu.mcp_efu.main --transport tcp --host 0.0.0.0 --port 8989
+    ```
 
 ## Protocol (Server Mode)
 
@@ -83,26 +85,44 @@ The server uses the **JSON-RPC 2.0** protocol over its transport. Each request a
 
 ## Testing
 
-To run the automated tests for the CLI mode, use the `unittest` module. This command will automatically discover and run all tests within the `servers/mcp_efu/tests` directory.
+This project uses Python's built-in `unittest` framework. Tests are located in the `tests/` directory.
+
+To run the automated tests, first ensure you are in the project's root directory (`servers/mcp_efu`), then use the following command:
 
 ```bash
-python -m unittest discover servers/mcp_efu/tests
+# Ensure you are in /path/to/servers/mcp_efu
+poetry run python -m unittest
 ```
 
-## Installation (Optional)
+This command uses Poetry to execute the test runner within the project's managed virtual environment. It will automatically discover and run all tests.
 
-While not required for use, you can install the package if you wish to make the `mcp_efu` command globally available from your shell.
+## Installation
 
-1.  **Navigate to the project directory**:
+This project is managed with [Poetry](https://python-poetry.org/).
+
+1.  **Install Poetry**: Follow the instructions on the [official website](https://python-poetry.org/docs/#installation).
+
+2.  **Navigate to the project directory**:
     ```bash
-    cd servers/mcp_efu
+    cd /path/to/servers/mcp_efu
     ```
 
-2.  **Install the package in editable mode**:
+3.  **Install dependencies**:
     ```bash
-    # It's good practice to use a virtual environment
-    # python -m venv venv
-    # source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    poetry install
+    ```
+    This command will create a virtual environment and install all the necessary dependencies defined in `pyproject.toml`.
 
-    pip install -e .
+4.  **Running the tool**:
+    After installation, the `mcp_efu` command is available within Poetry's virtual environment. You can run it using `poetry run` or by activating the virtual environment with `poetry shell`.
+    ```bash
+    # Run the tool via the defined script entry point
+    poetry run mcp_efu --help
+
+    # You can also run it as a module
+    poetry run python -m mcp_efu.main --help
+
+    # Alternatively, spawn a new shell first
+    poetry shell
+    (mcp_efu-py3.12) $ mcp_efu --help
     ```
