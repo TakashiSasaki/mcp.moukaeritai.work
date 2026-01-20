@@ -38,17 +38,21 @@ class TestTcpServerMode(unittest.TestCase):
         # Command to run the server in tcp mode.
         self.command = [
             sys.executable,
-            "-m", "mcp_efu.main",
+            "-m", "mcp_efu",
             "--transport", "tcp",
             "--port", str(self.port),
             "--host", self.host
         ]
+        self.env = os.environ.copy()
+        package_root = PROJECT_ROOT / "servers" / "mcp_efu"
+        self.env["PYTHONPATH"] = str(package_root) + os.pathsep + self.env.get("PYTHONPATH", "")
         self.server_process = subprocess.Popen(
             self.command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            env=self.env
         )
         # Wait for the server to start
         time.sleep(0.5) 

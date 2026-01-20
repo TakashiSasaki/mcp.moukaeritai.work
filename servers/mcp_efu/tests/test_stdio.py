@@ -24,13 +24,16 @@ class TestStdioServerMode(unittest.TestCase):
         (self.subdir / "server_file2.log").write_text("server-world")
         
         # Command to run the server in stdio mode.
-        # We run the module `mcp_efu.main` which should be available in the poetry env.
+        # We run the package `mcp_efu` which should be available in the env.
         self.command = [
             sys.executable,
-            "-m", "mcp_efu.main",
+            "-m", "mcp_efu",
             "--transport", "stdio"
         ]
         self.server_process = None
+        self.env = os.environ.copy()
+        package_root = PROJECT_ROOT / "servers" / "mcp_efu"
+        self.env["PYTHONPATH"] = str(package_root) + os.pathsep + self.env.get("PYTHONPATH", "")
 
     def tearDown(self):
         """Remove temp directory and terminate server process."""
@@ -66,7 +69,8 @@ class TestStdioServerMode(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            env=self.env
         )
 
         # Read and discard the server/hello notification
@@ -110,7 +114,8 @@ class TestStdioServerMode(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            env=self.env
         )
         
         # Read and discard the server/hello notification
@@ -151,7 +156,8 @@ class TestStdioServerMode(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            env=self.env
         )
 
         # Read and discard the server/hello notification
@@ -202,7 +208,8 @@ class TestStdioServerMode(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            env=self.env
         )
 
         # The server should immediately send a `server/hello` notification.

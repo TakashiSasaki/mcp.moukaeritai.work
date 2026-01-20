@@ -21,11 +21,12 @@ class TestCliMode(unittest.TestCase):
         self.subdir.mkdir(exist_ok=True)
         (self.subdir / "file2.log").write_text("world")
         
-        self.base_command = [sys.executable, "-m", "servers.mcp_efu.mcp_efu.main"]
+        self.base_command = [sys.executable, "-m", "mcp_efu"]
 
-        # Set up the environment for subprocesses to find the 'servers' module
+        # Set up the environment for subprocesses to find the package.
         self.env = os.environ.copy()
-        self.env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + self.env.get("PYTHONPATH", "")
+        package_root = PROJECT_ROOT / "servers" / "mcp_efu"
+        self.env["PYTHONPATH"] = str(package_root) + os.pathsep + self.env.get("PYTHONPATH", "")
 
     def tearDown(self):
         """Remove the temporary directory and its contents after each test."""

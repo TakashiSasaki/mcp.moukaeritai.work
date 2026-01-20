@@ -9,9 +9,11 @@ packages = [{include = "mcp_efu"}]
 
 [tool.poetry.dependencies]
 python = ">=3.8"
+fastmcp = "*"
 
 [tool.poetry.scripts]
 mcp_efu = "mcp_efu.main:main"
+mcp_efu-tests = "mcp_efu.test_runner:main"
 
 [build-system]
 requires = ["poetry-core"]

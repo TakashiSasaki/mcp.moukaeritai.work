@@ -21,13 +21,13 @@ def main():
         epilog="""
 Examples:
   # Run as a stdio server
-  python -m servers.mcp_efu.mcp_efu.main --transport stdio
+  python -m mcp_efu --transport stdio
 
   # Run as a one-off command to scan a directory and print JSON
-  python -m servers.mcp_efu.mcp_efu.main ./my_directory
+  python -m mcp_efu ./my_directory
 
   # Scan a directory and write the output to a file
-  python -m servers.mcp_efu.mcp_efu.main ./my_directory --output my_file_list.json
+  python -m mcp_efu ./my_directory --output my_file_list.json
 """
     )
 
