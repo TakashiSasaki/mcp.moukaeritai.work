@@ -37,7 +37,7 @@ class TestCliMode(unittest.TestCase):
         """Test that running with no arguments shows help and exits with an error."""
         result = subprocess.run(self.base_command, capture_output=True, text=True, encoding='utf-8', env=self.env)
         self.assertNotEqual(result.returncode, 0, "Should exit with a non-zero status code.")
-        self.assertIn("usage: main.py", result.stderr)
+        self.assertIn("usage: __main__.py", result.stderr)
         self.assertIn("No command or server transport specified", result.stderr)
 
     def test_valid_path_to_stdout(self):

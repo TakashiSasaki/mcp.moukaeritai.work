@@ -25,6 +25,11 @@ class TestTcpServerMode(unittest.TestCase):
     
     def setUp(self):
         """Create a temporary directory and files before each test."""
+        try:
+            self.port = find_free_port()
+        except PermissionError:
+            self.skipTest("TCP sockets not permitted in this environment.")
+
         self.test_dir = PROJECT_ROOT / "test_temp_dir_for_tcp"
         self.test_dir.mkdir(exist_ok=True)
         (self.test_dir / "tcp_file1.txt").write_text("tcp-hello")
@@ -32,7 +37,6 @@ class TestTcpServerMode(unittest.TestCase):
         self.subdir.mkdir(exist_ok=True)
         (self.subdir / "tcp_file2.log").write_text("tcp-world")
         
-        self.port = find_free_port()
         self.host = "127.0.0.1"
 
         # Command to run the server in tcp mode.
