@@ -45,6 +45,34 @@ This mode runs `mcp_efu` as an MCP server that communicates over `stdin` and `st
 poetry run mcp_efu --transport stdio
 ```
 
+Codex から利用する場合は、`~/.codex/config.toml` に次のように設定すると認識されます。
+
+```toml
+[mcp_servers.mcp_efu_stdio]
+command = "poetry"
+args = ["run", "mcp_efu", "--transport", "stdio"]
+cwd = "/workspaces/mcp.moukaeritai.work/servers/mcp_efu"
+```
+
+Gemini Code Assist や Gemini CLI から利用する場合は、`~/.gemini/settings.json` に次のように設定すると認識されます。
+
+```json
+{
+  "mcpServers": {
+    "mcp_efu_stdio": {
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_efu",
+        "--transport",
+        "stdio"
+      ],
+      "cwd": "/workspaces/mcp.moukaeritai.work/servers/mcp_efu"
+    }
+  }
+}
+```
+
 ### 3. HTTP Server Modes
 
 These modes run `mcp_efu` as an MCP server over HTTP.
