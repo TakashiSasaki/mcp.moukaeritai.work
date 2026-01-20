@@ -40,7 +40,7 @@ async def handle_connection(
         tools = [
             {
                 "name": "get_file_list",
-                "description": "指定されたパス内のファイルとディレクトリの一覧を取得します。",
+                "description": "指定されたパス内のファイルとディレクトリの一覧を取得します。日時は常にWindowsのFILETIME 64ビット整数で返します。",
                 "inputSchema": {
                     "type": "object",
                     "properties": {

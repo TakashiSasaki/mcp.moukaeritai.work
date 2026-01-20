@@ -72,7 +72,7 @@ Examples:
         efu_manager = EfuFileManager()
         server = FastMCP(name="EFU File Lister", version="0.1.0")
 
-        @server.tool(description="指定されたパス内のファイルとディレクトリの一覧を取得します。")
+        @server.tool(description="指定されたパス内のファイルとディレクトリの一覧を取得します。日時は常にWindowsのFILETIME 64ビット整数で返します。")
         def get_file_list(path: str) -> list[dict]:
             return efu_manager.get_file_list(path)
 

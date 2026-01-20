@@ -17,8 +17,8 @@ Scans a directory and returns an EFU-compatible list of files and directories.
 An array of entries. Each entry is an object with:
 - `filename`: Absolute path to the entry.
 - `size`: File size in bytes (directories are `0`).
-- `date_modified`: Windows FILETIME integer.
-- `date_created`: Windows FILETIME integer.
+- `date_modified`: Windows FILETIME 64-bit integer.
+- `date_created`: Windows FILETIME 64-bit integer.
 - `attributes`: Windows-style attribute flags.
 
 ### Notes
@@ -26,6 +26,7 @@ An array of entries. Each entry is an object with:
 - Entries that cannot be accessed due to permissions are skipped.
 - If `path` is not a directory, the tool returns an error.
 - The returned `filename` values are absolute paths.
+- Date fields are always converted to Windows FILETIME 64-bit integers, regardless of platform.
 
 ### Example
 Input:
