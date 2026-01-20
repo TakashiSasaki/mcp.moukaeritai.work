@@ -25,43 +25,63 @@ Examples:
 
   # Run as a one-off command to scan a directory and print JSON
   python -m servers.mcp_efu.mcp_efu.main ./my_directory
+
+  # Scan a directory and write the output to a file
+  python -m servers.mcp_efu.mcp_efu.main ./my_directory --output my_file_list.json
 """
     )
 
     # Server mode arguments
-    parser.add_argument(
+    server_group = parser.add_argument_group('Server Mode Arguments')
+    server_group.add_argument(
         "--transport",
         choices=["stdio", "tcp"],
         default=None,
-        help="Run as a server with the specified transport.\n             stdio: Use standard input/output for communication.\n             tcp: Use a TCP socket for communication."
+        help="Run as a server with the specified transport.\nstdio: Use standard input/output for communication.\ntcp: Use a TCP socket for communication."
     )
-    parser.add_argument(
+    server_group.add_argument(
         "--host",
         default="localhost",
         help="Host for TCP server to listen on (default: localhost)."
     )
-    parser.add_argument(
+    server_group.add_argument(
         "--port",
         type=int,
         default=8989,
         help="Port for TCP server to listen on (default: 8989)."
     )
 
-    # CLI mode argument
-    parser.add_argument(
+    # CLI mode arguments
+    cli_group = parser.add_argument_group('CLI Mode Arguments')
+    cli_group.add_argument(
         "path",
         nargs="?",  # Optional positional argument
         default=None,
         help="The path to scan. If provided, the tool runs as a one-off CLI command."
     )
+    cli_group.add_argument(
+        "-o", "--output",
+        metavar="FILE",
+        default=None,
+        help="Write output to a file instead of stdout."
+    )
+    cli_group.add_argument(
+        "--format",
+        choices=["json"],  # Add more formats like 'csv' in the future
+        default="json",
+        help="Output format (default: json)."
+    )
+
 
     args = parser.parse_args()
-
-    efu_manager = EfuFileManager()
 
     # --- Mode selection ---
     if args.transport:
         # --- Server Mode ---
+        if args.path:
+            parser.error("Positional argument 'path' cannot be used with --transport. For server mode, path is provided in the JSONRPC request.")
+
+        efu_manager = EfuFileManager()
         print(f"Starting server with transport: {args.transport}", file=sys.stderr)
         main_coroutine = None
         if args.transport == "stdio":
@@ -79,12 +99,30 @@ Examples:
     
     elif args.path:
         # --- CLI Mode ---
+        efu_manager = EfuFileManager()
         print(f"Running in CLI mode to scan path: {args.path}", file=sys.stderr)
         try:
             file_list = efu_manager.get_file_list(args.path)
-            # Pretty-print the JSON result to stdout
-            sys.stdout.write(json.dumps(file_list, indent=2))
-            sys.stdout.write('\n')
+            
+            # Handle output format
+            if args.format == "json":
+                output_data = json.dumps(file_list, indent=2)
+            else:
+                # This part is for future formats
+                print(f"Error: Unsupported format '{args.format}'", file=sys.stderr)
+                sys.exit(1)
+
+            # Handle output destination
+            if args.output:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write(output_data)
+                    f.write('\n')
+                print(f"Output successfully written to {args.output}", file=sys.stderr)
+            else:
+                # Write to stdout
+                sys.stdout.write(output_data)
+                sys.stdout.write('\n')
+
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)

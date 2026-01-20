@@ -1,12 +1,97 @@
 # mcp_efu
 
-`mcp_efu` is a simple server that provides read-only access to a local filesystem. It can communicate over a TCP socket or via standard input/output (stdio), making it suitable for use by AI agents or other local processes.
+`mcp_efu` is a server and command-line tool that generates file lists in a format compatible with the Everything File List (EFU). It can run as a persistent server communicating over TCP or stdio, or as a one-off command.
 
-The entire project is structured as an installable Python package.
+## Usage
 
-## Installation
+This tool can be run directly using the Python module runner (`python -m`) without installation.
 
-It is recommended to install the package in a virtual environment.
+There are two main modes of operation: CLI Mode and Server Mode.
+
+### CLI Mode
+
+This mode is for running a single scan and printing the results.
+
+**To scan a directory and print results to the console:**
+```bash
+# Scan the current directory
+python -m servers.mcp_efu.mcp_efu.main .
+
+# Scan a specific directory
+python -m servers.mcp_efu.mcp_efu.main /path/to/scan
+```
+
+**To save the results to a file:**
+Use the `-o` or `--output` option.
+```bash
+python -m servers.mcp_efu.mcp_efu.main . --output my_file_list.json
+```
+
+### Server Mode
+
+This mode runs a persistent server that accepts requests via a specified transport. All log messages are printed to `stderr` to keep `stdout` clean for data.
+
+**To start the server:**
+Use the `--transport` flag.
+
+```bash
+# Start a server listening on stdio
+python -m servers.mcp_efu.mcp_efu.main --transport stdio
+
+# Start a server listening on a TCP port
+python -m servers.mcp_efu.mcp_efu.main --transport tcp --host localhost --port 8989
+```
+
+## Protocol (Server Mode)
+
+The server uses the **JSON-RPC 2.0** protocol over its transport. Each request and response should be a single, newline-terminated JSON object.
+
+### Request Object
+
+- `jsonrpc`: Must be `"2.0"`.
+- `method`: The name of the method. Currently, only `"get_file_list"` is supported.
+- `params`: A list of parameters.
+  - For `get_file_list`, this should be a list containing a single string: the absolute path of the directory to scan.
+- `id`: A unique identifier for the request.
+
+**Example Request:**
+```json
+{"jsonrpc": "2.0", "method": "get_file_list", "params": ["/home/user/documents"], "id": 1}
+```
+
+### Response Object (Success)
+
+- `jsonrpc`: `"2.0"`.
+- `id`: The ID from the request.
+- `result`: The data returned by the method. For `get_file_list`, this is a list of file/directory objects.
+
+**Example Success Response:**
+```json
+{"id":1,"result":[{"filename":"/path/to/file.txt", "size":123, "date_modified": 134133637457112202, "date_created": 134133637457112202, "attributes": 32}],"jsonrpc":"2.0"}
+```
+
+### Response Object (Error)
+
+- `jsonrpc`: `"2.0"`.
+- `id`: The ID from the request.
+- `error`: An object containing `code` and `message`.
+
+**Example Error Response:**
+```json
+{"id":1,"error":{"code":-32000,"message":"Server error: Path '/nonexistent' is not a valid directory."},"jsonrpc":"2.0"}
+```
+
+## Testing
+
+To run the automated tests for the CLI mode, use the `unittest` module. This command will automatically discover and run all tests within the `servers/mcp_efu/tests` directory.
+
+```bash
+python -m unittest discover servers/mcp_efu/tests
+```
+
+## Installation (Optional)
+
+While not required for use, you can install the package if you wish to make the `mcp_efu` command globally available from your shell.
 
 1.  **Navigate to the project directory**:
     ```bash
@@ -14,91 +99,10 @@ It is recommended to install the package in a virtual environment.
     ```
 
 2.  **Install the package in editable mode**:
-    This allows you to modify the source code without reinstalling. The `.` refers to the current directory where `pyproject.toml` is located.
     ```bash
     # It's good practice to use a virtual environment
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\\Scripts\\activate`
+    # python -m venv venv
+    # source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-    # Install the package
     pip install -e .
     ```
-    After installation, the `mcp_efu` command will be available in your shell.
-
-
-## Usage
-
-The `mcp_efu` server can be started in two modes: `tcp` (default) or `stdio`. All log messages are printed to `stderr` to keep `stdout` clean for data responses in stdio mode.
-
-### TCP Mode
-
-This is the default mode. The server will listen on a specified host and port.
-
-**To start the server:**
-```bash
-# Start server with default settings (localhost:8989, serving current directory)
-mcp_efu
-
-# Start server on a different port and with a specific root directory
-mcp_efu --port 9000 --root /home/user/documents
-```
-
-**To test the connection (using `netcat` or `nc`):**
-1.  Open a new terminal.
-2.  Connect to the server: `nc localhost 8989`
-3.  Send a JSON request followed by a newline:
-    ```json
-    {"method": "list_directory", "params": {"path": "."}}
-    ```
-4.  The server will respond with a list of files and directories in JSON format and wait for the next request.
-
-### Stdio Mode
-
-In this mode, the server reads requests from `stdin` and writes responses to `stdout`.
-
-**To start the server:**
-```bash
-mcp_efu --mode stdio
-```
-
-**To test:**
-1.  The server will wait for input.
-2.  Paste or type a JSON request and press Enter:
-    ```json
-    {"method": "list_directory", "params": {"path": "."}}
-    ```
-3.  The server will print the JSON response to `stdout` and wait for the next request.
-
-## Protocol
-
-The server uses a simple line-delimited JSON protocol. Each request and response is a single line of text terminated by a newline character (`\\n`).
-
-### Request Format
-
-A JSON object with two keys:
-- `method`: The name of the method to call. Currently, only `"list_directory"` is supported.
-- `params`: A dictionary of parameters for the method.
-  - For `list_directory`, the only parameter is `"path"`, which is the relative path from the server's root directory.
-
-**Example Request:**
-```json
-{"method": "list_directory", "params": {"path": "mcp_efu"}}
-```
-
-### Response Format
-
-A JSON object with a `status` key and either a `data` or `message` key.
-
-- `status`: Either `"success"` or `"error"`.
-- `data` (on success): The result of the method. For `list_directory`, this is a list of objects, each containing `name`, `path`, and `is_dir`.
-- `message` (on error): A string describing the error.
-
-**Example Success Response:**
-```json
-{"status": "success", "data": [{"name": "__init__.py", "path": "mcp_efu/__init__.py", "is_dir": false}, {"name": "main.py", "path": "mcp_efu/main.py", "is_dir": false}]}
-```
-
-**Example Error Response:**
-```json
-{"status": "error", "message": "Access denied: Path is outside the root directory."}
-```
