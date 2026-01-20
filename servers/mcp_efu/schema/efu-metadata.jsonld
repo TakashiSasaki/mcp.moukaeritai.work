@@ -1,0 +1,56 @@
+{
+  "@context": ["http://www.w3.org/ns/csvw", {"@language": "ja"}],
+  "url": "everything_export.efu",
+  "dc:title": "Everything File List (CSV Format)",
+  "dc:creator": "Everything Search Engine",
+  "dialect": {
+    "delimiter": ",",
+    "header": true,
+    "quoteChar": "\"",
+    "encoding": "utf-8",
+    "skipRows": 0
+  },
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "filename",
+        "titles": "Filename",
+        "datatype": "string",
+        "required": true,
+        "propertyUrl": "http://schema.org/name",
+        "dc:description": "ファイルまたはフォルダのフルパス。"
+      },
+      {
+        "name": "size",
+        "titles": "Size",
+        "datatype": {
+          "base": "integer",
+          "emptyValue": null
+        },
+        "propertyUrl": "http://schema.org/contentSize",
+        "dc:description": "バイト単位のサイズ。フォルダの場合は空値（null）が許容される。"
+      },
+      {
+        "name": "date_modified",
+        "titles": "Date Modified",
+        "datatype": "integer",
+        "propertyUrl": "http://schema.org/dateModified",
+        "dc:description": "Windows FILETIME形式の最終更新日時。"
+      },
+      {
+        "name": "date_created",
+        "titles": "Date Created",
+        "datatype": "integer",
+        "propertyUrl": "http://schema.org/dateCreated",
+        "dc:description": "Windows FILETIME形式の作成日時。"
+      },
+      {
+        "name": "attributes",
+        "titles": "Attributes",
+        "datatype": "integer",
+        "dc:description": "Windowsファイル属性フラグ（16:Directory, 32:Archive等）。"
+      }
+    ],
+    "primaryKey": "filename"
+  }
+}
