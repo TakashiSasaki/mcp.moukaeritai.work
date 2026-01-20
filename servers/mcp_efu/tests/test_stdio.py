@@ -10,7 +10,7 @@ import threading
 
 # Add the project root to the path to allow running the module with -m
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-# sys.path.insert(0, str(PROJECT_ROOT)) # This may not be needed with poetry run
+sys.path.insert(0, str(PROJECT_ROOT))
 
 class TestStdioServerMode(unittest.TestCase):
     
@@ -27,7 +27,7 @@ class TestStdioServerMode(unittest.TestCase):
         # We run the module `mcp_efu.main` which should be available in the poetry env.
         self.command = [
             sys.executable,
-            "-m", "mcp_efu.main",
+            "-m", "servers.mcp_efu.mcp_efu.main",
             "--transport", "stdio"
         ]
         self.server_process = None
