@@ -27,7 +27,7 @@ class TestStdioServerMode(unittest.TestCase):
         # We run the module `mcp_efu.main` which should be available in the poetry env.
         self.command = [
             sys.executable,
-            "-m", "servers.mcp_efu.mcp_efu.main",
+            "-m", "mcp_efu.main",
             "--transport", "stdio"
         ]
         self.server_process = None

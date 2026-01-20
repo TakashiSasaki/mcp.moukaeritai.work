@@ -38,7 +38,7 @@ class TestTcpServerMode(unittest.TestCase):
         # Command to run the server in tcp mode.
         self.command = [
             sys.executable,
-            "-m", "servers.mcp_efu.mcp_efu.main",
+            "-m", "mcp_efu.main",
             "--transport", "tcp",
             "--port", str(self.port),
             "--host", self.host
