@@ -23,6 +23,10 @@ class TestCliMode(unittest.TestCase):
         
         self.base_command = [sys.executable, "-m", "servers.mcp_efu.mcp_efu.main"]
 
+        # Set up the environment for subprocesses to find the 'servers' module
+        self.env = os.environ.copy()
+        self.env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + self.env.get("PYTHONPATH", "")
+
     def tearDown(self):
         """Remove the temporary directory and its contents after each test."""
         if self.test_dir.exists():
@@ -30,7 +34,7 @@ class TestCliMode(unittest.TestCase):
 
     def test_no_args_shows_help(self):
         """Test that running with no arguments shows help and exits with an error."""
-        result = subprocess.run(self.base_command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(self.base_command, capture_output=True, text=True, encoding='utf-8', env=self.env)
         self.assertNotEqual(result.returncode, 0, "Should exit with a non-zero status code.")
         self.assertIn("usage: main.py", result.stderr)
         self.assertIn("No command or server transport specified", result.stderr)
@@ -38,7 +42,7 @@ class TestCliMode(unittest.TestCase):
     def test_valid_path_to_stdout(self):
         """Test that a valid path prints a JSON list to stdout."""
         command = self.base_command + [str(self.test_dir)]
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', check=True)
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', check=True, env=self.env)
         
         self.assertEqual(result.returncode, 0)
         self.assertIn("Running in CLI mode", result.stderr)
@@ -57,7 +61,7 @@ class TestCliMode(unittest.TestCase):
     def test_nonexistent_path_error(self):
         """Test that a non-existent path results in an error."""
         command = self.base_command + ["/path/to/nonexistent/dir"]
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', env=self.env)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("is not a valid directory", result.stderr)
         
@@ -65,14 +69,14 @@ class TestCliMode(unittest.TestCase):
         """Test that providing a file instead of a directory results in an error."""
         test_file = self.test_dir / "file1.txt"
         command = self.base_command + [str(test_file)]
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', env=self.env)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("is not a valid directory", result.stderr)
         
     def test_mixed_args_error(self):
         """Test that mixing server and CLI arguments results in an error."""
         command = self.base_command + [str(self.test_dir), "--transport", "stdio"]
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', env=self.env)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("cannot be used with --transport", result.stderr)
         
@@ -80,7 +84,7 @@ class TestCliMode(unittest.TestCase):
         """Test that the --output option writes the result to a file."""
         output_file = self.test_dir / "output.json"
         command = self.base_command + [str(self.test_dir), "--output", str(output_file)]
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', check=True)
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', check=True, env=self.env)
 
         self.assertEqual(result.returncode, 0)
         self.assertTrue(output_file.exists())
