@@ -1,0 +1,3 @@
+[mcp_efu_server_config]
+transport = "stdio"
+command = ["poetry", "run", "python", "-m", "servers.mcp_efu.mcp_efu", "--transport", "stdio"]
