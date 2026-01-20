@@ -24,7 +24,6 @@ def find_free_port():
 class TestTcpServerMode(unittest.TestCase):
     
     def setUp(self):
-        raise unittest.SkipTest("FastMCP stdio/sse only; tcp transport is not supported.")
         """Create a temporary directory and files before each test."""
         try:
             self.port = find_free_port()
@@ -40,44 +39,51 @@ class TestTcpServerMode(unittest.TestCase):
         
         self.host = "127.0.0.1"
 
-        # Command to run the server in tcp mode.
-        self.command = [
-            sys.executable,
-            "-m", "mcp_efu",
-            "--transport", "tcp",
-            "--port", str(self.port),
-            "--host", self.host
-        ]
         self.env = os.environ.copy()
         package_root = PROJECT_ROOT / "servers" / "mcp_efu"
         self.env["PYTHONPATH"] = str(package_root) + os.pathsep + self.env.get("PYTHONPATH", "")
+        self.env["MCP_EFU_TCP_HOST"] = self.host
+        self.env["MCP_EFU_TCP_PORT"] = str(self.port)
+
+        self.command = [
+            sys.executable,
+            "-c",
+            (
+                "import asyncio, os;"
+                "from mcp_efu.core import EfuFileManager;"
+                "from mcp_efu.transport import start_tcp_server;"
+                "host=os.environ['MCP_EFU_TCP_HOST'];"
+                "port=int(os.environ['MCP_EFU_TCP_PORT']);"
+                "asyncio.run(start_tcp_server(host, port, EfuFileManager()))"
+            ),
+        ]
         self.server_process = subprocess.Popen(
             self.command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8',
-            env=self.env
+            encoding="utf-8",
+            env=self.env,
         )
-        # Wait for the server to start
-        time.sleep(0.5) 
+        self._wait_for_server()
 
     def tearDown(self):
         """Remove temp directory and terminate server process."""
         if self.test_dir.exists():
             shutil.rmtree(self.test_dir)
-        
-        self.server_process.terminate()
-        try:
-            self.server_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.server_process.kill()
-            self.server_process.wait(timeout=5)
-        
-        # Capture and print stderr for debugging if tests fail
-        stderr_output = self.server_process.stderr.read()
-        if stderr_output:
-            print(f"TCP Server Stderr:\n{stderr_output}", file=sys.stderr)
+
+        if hasattr(self, "server_process"):
+            self.server_process.terminate()
+            try:
+                self.server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.server_process.kill()
+                self.server_process.wait(timeout=5)
+
+            # Capture and print stderr for debugging if tests fail
+            stderr_output = self.server_process.stderr.read()
+            if stderr_output:
+                print(f"TCP Server Stderr:\n{stderr_output}", file=sys.stderr)
 
 
     def _read_and_validate_server_hello(self, f):
@@ -92,6 +98,20 @@ class TestTcpServerMode(unittest.TestCase):
         params = response.get("params", {})
         self.assertEqual(params.get("displayName"), "EFU File Lister")
         return response
+
+    def _wait_for_server(self, timeout=5):
+        deadline = time.time() + timeout
+        last_error = None
+        while time.time() < deadline:
+            try:
+                with socket.create_connection((self.host, self.port), timeout=0.5) as sock:
+                    with sock.makefile("r", encoding="utf-8") as f:
+                        if f.readline():
+                            return
+            except (ConnectionRefusedError, socket.timeout, OSError) as exc:
+                last_error = exc
+                time.sleep(0.1)
+        raise RuntimeError(f"TCP server did not start: {last_error}")
 
     def test_tcp_server_hello_notification(self):
         """Test that the server sends a server/hello notification on connect over TCP."""
@@ -207,7 +227,11 @@ class TestTcpServerMode(unittest.TestCase):
                     self.assertEqual(response.get("id"), "tools-list-tcp-1")
                     self.assertIn("result", response)
                     self.assertIn("tools", response["result"])
-                    self.assertEqual(len(response["result"]["tools"]), 1)
+                    tool_names = {tool["name"] for tool in response["result"]["tools"]}
+                    self.assertEqual(
+                        tool_names,
+                        {"get_file_list", "get_md5_hash", "get_sha1_hash", "get_git_blob_hash"},
+                    )
         except ConnectionRefusedError:
             self.fail("Could not connect to the TCP server. Is it running?")
 
