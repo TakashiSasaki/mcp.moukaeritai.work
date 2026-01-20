@@ -1,19 +1,23 @@
-import unittest
-import subprocess
-import sys
-import os
+import hashlib
 import json
+import os
 import shutil
+import sys
+import unittest
+from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
-import time
-import threading
+
+import anyio
+from mcp.client.session import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 # Add the project root to the path to allow running the module with -m
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+
 class TestStdioServerMode(unittest.TestCase):
-    
     def setUp(self):
         """Create a temporary directory and files before each test."""
         self.test_dir = PROJECT_ROOT / "test_temp_dir_for_server"
@@ -22,216 +26,140 @@ class TestStdioServerMode(unittest.TestCase):
         self.subdir = self.test_dir / "server_subdir"
         self.subdir.mkdir(exist_ok=True)
         (self.subdir / "server_file2.log").write_text("server-world")
-        
-        # Command to run the server in stdio mode.
-        # We run the package `mcp_efu` which should be available in the env.
-        self.command = [
-            sys.executable,
-            "-m", "mcp_efu",
-            "--transport", "stdio"
-        ]
-        self.server_process = None
-        self.env = os.environ.copy()
-        package_root = PROJECT_ROOT / "servers" / "mcp_efu"
-        self.env["PYTHONPATH"] = str(package_root) + os.pathsep + self.env.get("PYTHONPATH", "")
+        self._timeout_seconds = 5
 
     def tearDown(self):
-        """Remove temp directory and terminate server process."""
+        """Remove temp directory."""
         if self.test_dir.exists():
             shutil.rmtree(self.test_dir)
-        if self.server_process:
-            # Gently try to close streams first
-            if self.server_process.stdin:
-                self.server_process.stdin.close()
-            
-            # Terminate the process
-            self.server_process.terminate()
-            try:
-                # Wait for the process to terminate
-                self.server_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                # Force kill if it doesn't terminate gracefully
-                self.server_process.kill()
-                # Wait again to ensure it's gone
-                self.server_process.wait(timeout=2)
-            
-            # Close the other streams after the process has ended
-            if self.server_process.stdout:
-                self.server_process.stdout.close()
-            if self.server_process.stderr:
-                self.server_process.stderr.close()
 
-    def test_stdio_get_file_list_success(self):
-        """Test a successful get_file_list request over stdio."""
-        self.server_process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            env=self.env
+    def _server_params(self) -> StdioServerParameters:
+        return StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "mcp_efu", "--transport", "stdio"],
+            cwd=str(PROJECT_ROOT / "servers" / "mcp_efu"),
+            env=os.environ.copy(),
         )
 
-        # Read and discard the server/hello notification
-        self.server_process.stdout.readline()
+    @asynccontextmanager
+    async def _session(self):
+        params = self._server_params()
+        async with stdio_client(params) as (read_stream, write_stream):
+            async with ClientSession(
+                read_stream,
+                write_stream,
+                read_timeout_seconds=timedelta(seconds=self._timeout_seconds),
+            ) as session:
+                await session.initialize()
+                yield session
 
-        request = {
-            "jsonrpc": "2.0",
-            "method": "get_file_list",
-            "params": [str(self.test_dir)],
-            "id": 1
-        }
-        
-        # Send request
-        self.server_process.stdin.write(json.dumps(request) + '\n')
-        self.server_process.stdin.flush()
+    def _content_to_json(self, result):
+        self.assertFalse(result.isError)
+        self.assertTrue(result.content)
+        blocks = [
+            block.text for block in result.content if getattr(block, "type", None) == "text"
+        ]
+        self.assertTrue(blocks)
+        parsed = [json.loads(block) for block in blocks]
+        if len(parsed) == 1:
+            return parsed[0]
+        return parsed
 
-        # Read response
-        response_line = self.server_process.stdout.readline()
-        self.assertTrue(response_line, "Server did not respond.")
-        
-        response = json.loads(response_line)
-
-        # Assertions
-        self.assertEqual(response.get("jsonrpc"), "2.0")
-        self.assertEqual(response.get("id"), 1)
-        self.assertIn("result", response)
-        
-        result = response["result"]
-        self.assertIsInstance(result, list)
-        # test_dir, file1, subdir, file2 (4 entries)
-        self.assertEqual(len(result), 4)
-        filenames = {item['filename'] for item in result}
-        self.assertIn(str(self.test_dir.resolve()), filenames)
-        self.assertIn(str((self.test_dir / "server_file1.txt").resolve()), filenames)
-
-    def test_stdio_invalid_path_error(self):
-        """Test an error response for a non-existent path over stdio."""
-        self.server_process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            env=self.env
+    def _content_to_text(self, result):
+        self.assertTrue(result.content)
+        return "".join(
+            block.text for block in result.content if getattr(block, "type", None) == "text"
         )
-        
-        # Read and discard the server/hello notification
-        self.server_process.stdout.readline()
 
-        request = {
-            "jsonrpc": "2.0",
-            "method": "get_file_list",
-            "params": ["/path/to/nonexistent/dir"],
-            "id": 2
-        }
+    def _run_async(self, coro):
+        async def runner():
+            with anyio.fail_after(self._timeout_seconds):
+                return await coro()
 
-        # Send request
-        self.server_process.stdin.write(json.dumps(request) + '\n')
-        self.server_process.stdin.flush()
+        return anyio.run(runner)
 
-        # Read response
-        response_line = self.server_process.stdout.readline()
-        self.assertTrue(response_line, "Server did not respond.")
+    def test_stdio_initialize(self):
+        async def run():
+            async with stdio_client(self._server_params()) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    result = await session.initialize()
+                    self.assertEqual(result.serverInfo.name, "EFU File Lister")
 
-        response = json.loads(response_line)
-        
-        # Assertions
-        self.assertEqual(response.get("jsonrpc"), "2.0")
-        self.assertEqual(response.get("id"), 2)
-        self.assertIn("error", response)
-        self.assertNotIn("result", response)
-        
-        error = response["error"]
-        self.assertEqual(error.get("code"), -32000)
-        self.assertIn("is not a valid directory", error.get("message"))
+        self._run_async(run)
 
     def test_stdio_tools_list(self):
-        """Test a successful tools/list request over stdio."""
-        self.server_process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            env=self.env
-        )
+        async def run():
+            async with self._session() as session:
+                result = await session.list_tools()
+                tool_names = {tool.name for tool in result.tools}
+                self.assertEqual(
+                    tool_names,
+                    {"get_file_list", "get_md5_hash", "get_sha1_hash", "get_git_blob_hash"},
+                )
 
-        # Read and discard the server/hello notification
-        self.server_process.stdout.readline()
+        self._run_async(run)
 
-        request = {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": "tools-list-1"
-        }
-        
-        # Send request
-        self.server_process.stdin.write(json.dumps(request) + '\n')
-        self.server_process.stdin.flush()
+    def test_stdio_get_file_list_success(self):
+        async def run():
+            async with self._session() as session:
+                result = await session.call_tool(
+                    "get_file_list", {"path": str(self.test_dir)}
+                )
+                payload = self._content_to_json(result)
+                self.assertIsInstance(payload, list)
+                self.assertEqual(len(payload), 4)
+                filenames = {item["filename"] for item in payload}
+                self.assertIn(str(self.test_dir.resolve()), filenames)
+                self.assertIn(
+                    str((self.test_dir / "server_file1.txt").resolve()),
+                    filenames,
+                )
 
-        # Read response
-        response_line = self.server_process.stdout.readline()
-        self.assertTrue(response_line, "Server did not respond.")
-        
-        response = json.loads(response_line)
+        self._run_async(run)
 
-        # Assertions
-        self.assertEqual(response.get("jsonrpc"), "2.0")
-        self.assertEqual(response.get("id"), "tools-list-1")
-        self.assertIn("result", response)
-        
-        result = response["result"]
-        self.assertIn("tools", result)
-        tools = result["tools"]
-        self.assertIsInstance(tools, list)
-        self.assertEqual(len(tools), 1)
+    def test_stdio_invalid_path_error(self):
+        async def run():
+            async with self._session() as session:
+                result = await session.call_tool(
+                    "get_file_list", {"path": "/path/to/nonexistent/dir"}
+                )
+                self.assertTrue(result.isError)
+                message = self._content_to_text(result)
+                self.assertIn("not a valid directory", message)
 
-        tool = tools[0]
-        self.assertEqual(tool["name"], "get_file_list")
-        self.assertIn("指定されたパス内のファイルとディレクトリの一覧を取得します。", tool["description"])
-        
-        input_schema = tool["inputSchema"]
-        self.assertEqual(input_schema["type"], "object")
-        self.assertIn("path", input_schema["properties"])
-        self.assertEqual(input_schema["properties"]["path"]["type"], "string")
-        self.assertEqual(input_schema["required"], ["path"])
+        self._run_async(run)
 
-    def test_stdio_server_hello_notification(self):
-        """Test that the server sends a server/hello notification on connect."""
-        self.server_process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            env=self.env
-        )
+    def test_stdio_hash_methods(self):
+        async def run():
+            async with self._session() as session:
+                target = self.test_dir / "server_file1.txt"
+                target_str = str(target)
+                expected_path = str(target.absolute())
+                expected_realpath = str(target.resolve())
+                contents = target.read_bytes()
+                requests = [
+                    ("get_md5_hash", hashlib.md5(contents).hexdigest()),
+                    ("get_sha1_hash", hashlib.sha1(contents).hexdigest()),
+                    (
+                        "get_git_blob_hash",
+                        hashlib.sha1(f"blob {len(contents)}\0".encode() + contents).hexdigest(),
+                    ),
+                ]
 
-        # The server should immediately send a `server/hello` notification.
-        # We should be able to read it without sending any request.
-        response_line = self.server_process.stdout.readline()
-        self.assertTrue(response_line, "Server did not send the server/hello notification.")
-        
-        response = json.loads(response_line)
+                for method, digest in requests:
+                    result = await session.call_tool(method, {"path": target_str})
+                    payload = self._content_to_json(result)
+                    self.assertEqual(
+                        payload,
+                        {
+                            "path": expected_path,
+                            "realpath": expected_realpath,
+                            "hash": digest,
+                        },
+                    )
 
-        # Assertions for server/hello notification
-        self.assertEqual(response.get("jsonrpc"), "2.0")
-        self.assertEqual(response.get("method"), "server/hello")
-        self.assertNotIn("id", response)  # Notifications must not have an id
+        self._run_async(run)
 
-        params = response.get("params", {})
-        self.assertEqual(params.get("displayName"), "EFU File Lister")
-        self.assertIn("tools", params)
-        
-        tools = params["tools"]
-        self.assertIsInstance(tools, list)
-        self.assertEqual(len(tools), 1)
-        self.assertEqual(tools[0]["name"], "get_file_list")
 
 if __name__ == "__main__":
     unittest.main()

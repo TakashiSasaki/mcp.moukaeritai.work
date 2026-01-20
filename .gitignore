@@ -4,3 +4,4 @@ __pycache__
 node_modules
 test_temp_dir_for_server/server_file1.txt
 test_temp_dir_for_server/server_subdir/server_file2.log
+test_temp_dir_for_cli/file1.txt

@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "mcp_efu"}]
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10"
 fastmcp = "*"
 
 [tool.poetry.scripts]

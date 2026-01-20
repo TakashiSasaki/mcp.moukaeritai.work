@@ -76,6 +76,18 @@ Examples:
         def get_file_list(path: str) -> list[dict]:
             return efu_manager.get_file_list(path)
 
+        @server.tool(description="指定されたフルパスのファイルのMD5ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。")
+        def get_md5_hash(path: str) -> dict:
+            return efu_manager.get_md5_hash(path)
+
+        @server.tool(description="指定されたフルパスのファイルのSHA1ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。")
+        def get_sha1_hash(path: str) -> dict:
+            return efu_manager.get_sha1_hash(path)
+
+        @server.tool(description="指定されたフルパスのファイルのGit Blob SHA1ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。")
+        def get_git_blob_hash(path: str) -> dict:
+            return efu_manager.get_git_blob_hash(path)
+
         print(f"Starting MCP server with transport: {args.transport}", file=sys.stderr)
         try:
             server.run(transport=args.transport)
