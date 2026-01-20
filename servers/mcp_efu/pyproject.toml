@@ -1,18 +1,18 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "mcp_efu"
 version = "0.1.0"
 description = "A simple MCP server to list files in the local filesystem."
-authors = [{ name = "AI Assistant" }]
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
+authors = ["Takashi Sasaki <takashi316@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "mcp_efu"}]
 
-[project.entry-points."console_scripts"]
+[tool.poetry.dependencies]
+python = ">=3.8"
+
+[tool.poetry.scripts]
 mcp_efu = "mcp_efu.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
