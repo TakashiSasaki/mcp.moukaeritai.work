@@ -2,47 +2,60 @@
 
 `mcp_efu` is a server and command-line tool that generates file lists in a format compatible with the Everything File List (EFU). It can run as a persistent server communicating over TCP or stdio, or as a one-off command.
 
-## Modes of Operation
+## Installation
 
-`mcp_efu` can be run in three distinct modes depending on your needs.
+This project is managed with [Poetry](https://python-poetry.org/).
 
-### 1. CLI Mode (Command-Line Interface)
+1.  **Install Poetry**: Follow the instructions on the [official website](https://python-poetry.org/docs/#installation).
 
-This mode is designed for direct, interactive use by a person in a terminal. It functions as a simple, one-off command to scan a directory and see the results immediately.
-
-*   **Function:** Scans a specified local directory path.
-*   **Output:** Prints a JSON-formatted list of file information to standard output.
-*   **Use Case:** Manually inspecting the contents of a directory or scripting simple file operations in a shell environment.
-*   **Example:**
+2.  **Navigate to the project directory**:
     ```bash
-    # Scan a directory and print to console
-    python -m servers.mcp_efu.mcp_efu.main /path/to/your/directory
-
-    # Scan and save the output to a file
-    python -m servers.mcp_efu.mcp_efu.main . --output file-list.json
+    cd /path/to/servers/mcp_efu
     ```
+
+3.  **Install dependencies**:
+    ```bash
+    poetry install
+    ```
+    This command will create a virtual environment and install all the necessary dependencies defined in `pyproject.toml`.
+
+## Usage (Running the Server)
+
+After installation, the `mcp_efu` command is available within Poetry's virtual environment. You can run it using `poetry run` or by activating the virtual environment with `poetry shell`.
+
+There are three modes of operation.
+
+### 1. CLI Mode (One-off file listing)
+
+This mode scans a directory and prints the file list to the console as a JSON object.
+
+```bash
+# Scan a directory and print to console
+poetry run mcp_efu /path/to/your/directory
+
+# Scan the current directory and save the output to a file
+poetry run mcp_efu . --output file-list.json
+```
 
 ### 2. STDIO Server Mode
 
-This mode runs `mcp_efu` as a persistent server process that communicates over standard input (`stdin`) and standard output (`stdout`). It is designed for machine-to-machine communication, where one process controls another.
+This mode runs `mcp_efu` as a persistent server that communicates over `stdin` and `stdout` using JSON-RPC 2.0.
 
-*   **Function:** Listens for JSON-RPC 2.0 requests on `stdin` and sends responses to `stdout`. All log messages are sent to `stderr` to keep the data channel clean.
-*   **Use Case:** Integrating `mcp_efu` with another application on the same machine. For example, a parent Node.js or Python script could launch and communicate with this server to get file lists without using network sockets.
-*   **Example:**
-    ```bash
-    python -m servers.mcp_efu.mcp_efu.main --transport stdio
-    ```
+```bash
+poetry run mcp_efu --transport stdio
+```
 
 ### 3. TCP Server Mode
 
-This mode runs `mcp_efu` as a persistent network server that listens for connections on a TCP socket.
+This mode runs `mcp_efu` as a persistent network server that listens for JSON-RPC 2.0 requests on a TCP socket.
 
-*   **Function:** Listens for JSON-RPC 2.0 requests on a specified network port and sends responses back over the same socket. All log messages are sent to `stderr`.
-*   **Use Case:** Allowing applications on a local or remote network to connect and request file lists. This is the most flexible option for building a distributed system where a central application needs to query file information from multiple machines.
-*   **Example:**
-    ```bash
-    python -m servers.mcp_efu.mcp_efu.main --transport tcp --host 0.0.0.0 --port 8989
-    ```
+```bash
+# Run on localhost, port 8989
+poetry run mcp_efu --transport tcp --host 127.0.0.1 --port 8989
+
+# Run on all network interfaces
+poetry run mcp_efu --transport tcp --host 0.0.0.0 --port 8989
+```
 
 ## Protocol (Server Mode)
 
@@ -91,38 +104,7 @@ To run the automated tests, first ensure you are in the project's root directory
 
 ```bash
 # Ensure you are in /path/to/servers/mcp_efu
-poetry run python -m unittest
+poetry run python -m unittest discover
 ```
 
 This command uses Poetry to execute the test runner within the project's managed virtual environment. It will automatically discover and run all tests.
-
-## Installation
-
-This project is managed with [Poetry](https://python-poetry.org/).
-
-1.  **Install Poetry**: Follow the instructions on the [official website](https://python-poetry.org/docs/#installation).
-
-2.  **Navigate to the project directory**:
-    ```bash
-    cd /path/to/servers/mcp_efu
-    ```
-
-3.  **Install dependencies**:
-    ```bash
-    poetry install
-    ```
-    This command will create a virtual environment and install all the necessary dependencies defined in `pyproject.toml`.
-
-4.  **Running the tool**:
-    After installation, the `mcp_efu` command is available within Poetry's virtual environment. You can run it using `poetry run` or by activating the virtual environment with `poetry shell`.
-    ```bash
-    # Run the tool via the defined script entry point
-    poetry run mcp_efu --help
-
-    # You can also run it as a module
-    poetry run python -m mcp_efu.main --help
-
-    # Alternatively, spawn a new shell first
-    poetry shell
-    (mcp_efu-py3.12) $ mcp_efu --help
-    ```
