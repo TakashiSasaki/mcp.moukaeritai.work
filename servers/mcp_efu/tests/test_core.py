@@ -70,6 +70,27 @@ class TestEfuFileManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.efu.get_file_list("/path/to/nonexistent/dir")
 
+    def test_hashes_for_file(self):
+        target = self.test_dir / "normal.txt"
+        abs_target = str(target.absolute())
+        real_target = str(target.resolve())
+        self.assertEqual(
+            self.efu.get_md5_hash(str(target)),
+            {"path": abs_target, "realpath": real_target, "hash": "5d41402abc4b2a76b9719d911017c592"},
+        )
+        self.assertEqual(
+            self.efu.get_sha1_hash(str(target)),
+            {"path": abs_target, "realpath": real_target, "hash": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"},
+        )
+        self.assertEqual(
+            self.efu.get_git_blob_hash(str(target)),
+            {"path": abs_target, "realpath": real_target, "hash": "b6fc4c620b67d95f953a5c1c1230aaab5db5a1b0"},
+        )
+
+    def test_hash_invalid_path_raises(self):
+        with self.assertRaises(ValueError):
+            self.efu.get_md5_hash("/path/to/nonexistent/file.txt")
+
 
 if __name__ == "__main__":
     unittest.main()

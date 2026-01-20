@@ -17,6 +17,13 @@ def create_error_response(req_id, code, message):
         "jsonrpc": "2.0"
     }
 
+def extract_path_param(params):
+    if isinstance(params, list) and len(params) == 1 and isinstance(params[0], str):
+        return params[0]
+    if isinstance(params, dict) and isinstance(params.get("path"), str):
+        return params.get("path")
+    return None
+
 async def handle_connection(
     reader: asyncio.StreamReader,
     writer: asyncio.StreamWriter,
@@ -40,6 +47,48 @@ async def handle_connection(
                         "path": {
                             "type": "string",
                             "description": "スキャンするルートパス"
+                        }
+                    },
+                    "required": ["path"]
+                }
+            },
+            {
+                "name": "get_md5_hash",
+                "description": "指定されたフルパスのファイルのMD5ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "ハッシュを計算するファイルのフルパス"
+                        }
+                    },
+                    "required": ["path"]
+                }
+            },
+            {
+                "name": "get_sha1_hash",
+                "description": "指定されたフルパスのファイルのSHA1ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "ハッシュを計算するファイルのフルパス"
+                        }
+                    },
+                    "required": ["path"]
+                }
+            },
+            {
+                "name": "get_git_blob_hash",
+                "description": "指定されたフルパスのファイルのGit Blob SHA1ハッシュを取得します。戻り値のpathは絶対パス、realpathは実体パスです。",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "ハッシュを計算するファイルのフルパス"
                         }
                     },
                     "required": ["path"]
@@ -85,18 +134,41 @@ async def handle_connection(
                     response = create_success_response(req_id, {"tools": tools})
 
                 elif method == "get_file_list":
-                    path = None
-                    # Handle positional parameters: params: ["/path/to/scan"]
-                    if isinstance(params, list) and len(params) == 1 and isinstance(params[0], str):
-                        path = params[0]
-                    # Handle named parameters: params: {"path": "/path/to/scan"}
-                    elif isinstance(params, dict) and isinstance(params.get("path"), str):
-                        path = params.get("path")
-
+                    path = extract_path_param(params)
                     if path is not None:
                         try:
                             file_list = efu_manager.get_file_list(path)
                             response = create_success_response(req_id, file_list)
+                        except ValueError as e:
+                            response = create_error_response(req_id, -32000, f"Server error: {e}")
+                    else:
+                        response = create_error_response(req_id, -32602, "Invalid params: Expected a list with one string [path] or an object {'path': '...'}.")
+                elif method == "get_md5_hash":
+                    path = extract_path_param(params)
+                    if path is not None:
+                        try:
+                            result = efu_manager.get_md5_hash(path)
+                            response = create_success_response(req_id, result)
+                        except ValueError as e:
+                            response = create_error_response(req_id, -32000, f"Server error: {e}")
+                    else:
+                        response = create_error_response(req_id, -32602, "Invalid params: Expected a list with one string [path] or an object {'path': '...'}.")
+                elif method == "get_sha1_hash":
+                    path = extract_path_param(params)
+                    if path is not None:
+                        try:
+                            result = efu_manager.get_sha1_hash(path)
+                            response = create_success_response(req_id, result)
+                        except ValueError as e:
+                            response = create_error_response(req_id, -32000, f"Server error: {e}")
+                    else:
+                        response = create_error_response(req_id, -32602, "Invalid params: Expected a list with one string [path] or an object {'path': '...'}.")
+                elif method == "get_git_blob_hash":
+                    path = extract_path_param(params)
+                    if path is not None:
+                        try:
+                            result = efu_manager.get_git_blob_hash(path)
+                            response = create_success_response(req_id, result)
                         except ValueError as e:
                             response = create_error_response(req_id, -32000, f"Server error: {e}")
                     else:

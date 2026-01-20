@@ -1,4 +1,5 @@
 # mcp_efu/core.py
+import hashlib
 import os
 import stat
 from pathlib import Path
@@ -60,9 +61,57 @@ class EfuFileManager:
                     continue
         return file_list
 
+    def get_md5_hash(self, file_path_str: str) -> dict:
+        """Returns the MD5 hash for the given file path."""
+        file_path, real_path = self._resolve_file_path(file_path_str)
+        return {
+            "path": str(file_path),
+            "realpath": str(real_path),
+            "hash": self._hash_file(file_path, hashlib.md5()),
+        }
+
+    def get_sha1_hash(self, file_path_str: str) -> dict:
+        """Returns the SHA1 hash for the given file path."""
+        file_path, real_path = self._resolve_file_path(file_path_str)
+        return {
+            "path": str(file_path),
+            "realpath": str(real_path),
+            "hash": self._hash_file(file_path, hashlib.sha1()),
+        }
+
+    def get_git_blob_hash(self, file_path_str: str) -> dict:
+        """Returns the Git blob SHA1 hash for the given file path."""
+        file_path, real_path = self._resolve_file_path(file_path_str)
+        hasher = hashlib.sha1()
+        size = file_path.stat().st_size
+        header = f"blob {size}\0".encode()
+        hasher.update(header)
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                hasher.update(chunk)
+        return {
+            "path": str(file_path),
+            "realpath": str(real_path),
+            "hash": hasher.hexdigest(),
+        }
+
     def _unix_to_filetime(self, unix_timestamp: float) -> int:
         """Converts a UNIX timestamp to a Windows FILETIME integer."""
         return int(unix_timestamp * HUNDREDS_OF_NANOSECONDS) + (EPOCH_DIFFERENCE_SECONDS * HUNDREDS_OF_NANOSECONDS)
+
+    def _resolve_file_path(self, file_path_str: str) -> tuple[Path, Path]:
+        input_path = Path(file_path_str).expanduser()
+        file_path = input_path if input_path.is_absolute() else (Path.cwd() / input_path)
+        real_path = file_path.resolve()
+        if not file_path.is_file():
+            raise ValueError(f"Path '{file_path_str}' is not a valid file.")
+        return file_path, real_path
+
+    def _hash_file(self, file_path: Path, hasher: "hashlib._Hash") -> str:
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
 
     def _get_attributes(self, path: Path, stat_info, is_dir: bool) -> int:
         """Gets basic Windows-like attributes from stat info."""
