@@ -2,3 +2,5 @@
 __pycache__
 /output.json
 node_modules
+test_temp_dir_for_server/server_file1.txt
+test_temp_dir_for_server/server_subdir/server_file2.log
