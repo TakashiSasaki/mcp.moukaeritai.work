@@ -90,9 +90,9 @@ poetry run mcp_efu --transport streamable-http
 The MCP server exposes the following tools:
 
 - `get_file_list(path: str)`: Returns the EFU-compatible file list for the given path. Dates are always returned as Windows FILETIME 64-bit integers.
-- `get_md5_hash(path: str)`: Returns the MD5 hash for the given file path.
-- `get_sha1_hash(path: str)`: Returns the SHA1 hash for the given file path.
-- `get_git_blob_hash(path: str)`: Returns the Git blob SHA1 hash for the given file path.
+- `get_md5_hash(path: str)`: Returns the MD5 hash for the given absolute file path.
+- `get_sha1_hash(path: str)`: Returns the SHA1 hash for the given absolute file path.
+- `get_git_blob_hash(path: str)`: Returns the Git blob SHA1 hash for the given absolute file path.
 
 See `METHODS.md` for a human-readable description of the tool, inputs, and outputs.
 

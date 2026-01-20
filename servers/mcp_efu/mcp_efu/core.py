@@ -101,7 +101,9 @@ class EfuFileManager:
 
     def _resolve_file_path(self, file_path_str: str) -> tuple[Path, Path]:
         input_path = Path(file_path_str).expanduser()
-        file_path = input_path if input_path.is_absolute() else (Path.cwd() / input_path)
+        if not input_path.is_absolute():
+            raise ValueError(f"Path '{file_path_str}' must be absolute.")
+        file_path = input_path
         real_path = file_path.resolve()
         if not file_path.is_file():
             raise ValueError(f"Path '{file_path_str}' is not a valid file.")

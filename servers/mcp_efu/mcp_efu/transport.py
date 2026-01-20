@@ -60,7 +60,7 @@ async def handle_connection(
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "ハッシュを計算するファイルのフルパス"
+                            "description": "ハッシュを計算するファイルの絶対パス"
                         }
                     },
                     "required": ["path"]
@@ -74,7 +74,7 @@ async def handle_connection(
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "ハッシュを計算するファイルのフルパス"
+                            "description": "ハッシュを計算するファイルの絶対パス"
                         }
                     },
                     "required": ["path"]
@@ -88,7 +88,7 @@ async def handle_connection(
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "ハッシュを計算するファイルのフルパス"
+                            "description": "ハッシュを計算するファイルの絶対パス"
                         }
                     },
                     "required": ["path"]

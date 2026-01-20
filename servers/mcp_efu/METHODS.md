@@ -62,7 +62,7 @@ Returns the MD5 hash of a file given its full path.
 - You need an MD5 digest for a specific file.
 
 ### Input
-- `path` (string, required): Absolute or relative path to the file.
+- `path` (string, required): Absolute path to the file.
 
 ### Output
 An object containing:
@@ -94,7 +94,7 @@ Returns the SHA1 hash of a file given its full path.
 - You need a SHA1 digest for a specific file.
 
 ### Input
-- `path` (string, required): Absolute or relative path to the file.
+- `path` (string, required): Absolute path to the file.
 
 ### Output
 An object containing:
@@ -126,7 +126,7 @@ Returns the Git blob SHA1 hash of a file given its full path.
 - You need the Git blob hash for a file without invoking Git.
 
 ### Input
-- `path` (string, required): Absolute or relative path to the file.
+- `path` (string, required): Absolute path to the file.
 
 ### Output
 An object containing:
