@@ -3,7 +3,8 @@
         "sudo apk update",
         "sudo apk add npm",
         "npm install @openai/codex",
-        "npm install @google/gemini-cli"
+        "npm install @google/gemini-cli",
+        "sudo apk add git-lfs"
     ],
     "customizations": {
         "vscode": {
