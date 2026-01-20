@@ -1,0 +1,3 @@
+[submodule "schema.moukaeritai.work"]
+	path = schema.moukaeritai.work
+	url = https://github.com/TakashiSasaki/schema.moukaeritai.work.git
