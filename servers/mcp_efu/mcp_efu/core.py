@@ -1,85 +1,81 @@
 # mcp_efu/core.py
 import os
-import json
+import stat
 from pathlib import Path
 
-class FileSystemManager:
-    """
-    Handles read-only access to the filesystem within a specific root directory.
-    """
-    def __init__(self, root_path: str):
-        """
-        Initializes the FileSystemManager with a specific root directory.
+# Constants for FILETIME conversion
+EPOCH_DIFFERENCE_SECONDS = 11644473600
+HUNDREDS_OF_NANOSECONDS = 10_000_000
 
-        Args:
-            root_path: The absolute or relative path to the directory that will
-                       serve as the root for all file operations.
+# Basic Windows file attributes
+FILE_ATTRIBUTE_DIRECTORY = 0x10
+FILE_ATTRIBUTE_ARCHIVE = 0x20
+FILE_ATTRIBUTE_READONLY = 0x01
+FILE_ATTRIBUTE_HIDDEN = 0x02
+
+class EfuFileManager:
+    """
+    Scans a directory and generates a file list in the EFU format.
+    """
+
+    def get_file_list(self, root_path_str: str) -> list[dict]:
+        """
+        Recursively walks through the given path and collects file information
+        in the EFU format.
+        """
+        root_path = Path(root_path_str).resolve()
+        if not root_path.is_dir():
+            raise ValueError(f"Path '{root_path_str}' is not a valid directory.")
+
+        file_list = []
+        # Add the root path itself to the list
+        try:
+            stat_info = root_path.stat(follow_symlinks=False)
+            file_list.append({
+                "filename": str(root_path),
+                "size": 0,
+                "date_modified": self._unix_to_filetime(stat_info.st_mtime),
+                "date_created": self._unix_to_filetime(stat_info.st_ctime),
+                "attributes": self._get_attributes(root_path, stat_info, True)
+            })
+        except (FileNotFoundError, PermissionError) as e:
+            raise ValueError(f"Cannot access root path '{root_path_str}': {e}")
+
+
+        for dirpath, dirnames, filenames in os.walk(root_path):
+            entries = [(d, True) for d in dirnames] + [(f, False) for f in filenames]
+            for name, is_dir in entries:
+                full_path = Path(dirpath) / name
+                try:
+                    stat_info = full_path.stat(follow_symlinks=False)
+                    
+                    file_list.append({
+                        "filename": str(full_path),
+                        "size": stat_info.st_size if not is_dir else 0,
+                        "date_modified": self._unix_to_filetime(stat_info.st_mtime),
+                        "date_created": self._unix_to_filetime(stat_info.st_ctime),
+                        "attributes": self._get_attributes(full_path, stat_info, is_dir)
+                    })
+                except (FileNotFoundError, PermissionError):
+                    continue
+        return file_list
+
+    def _unix_to_filetime(self, unix_timestamp: float) -> int:
+        """Converts a UNIX timestamp to a Windows FILETIME integer."""
+        return int(unix_timestamp * HUNDREDS_OF_NANOSECONDS) + (EPOCH_DIFFERENCE_SECONDS * HUNDREDS_OF_NANOSECONDS)
+
+    def _get_attributes(self, path: Path, stat_info, is_dir: bool) -> int:
+        """Gets basic Windows-like attributes from stat info."""
+        attrs = 0
+        if not (stat_info.st_mode & stat.S_IWUSR):
+            attrs |= FILE_ATTRIBUTE_READONLY
         
-        Raises:
-            ValueError: If the root_path is not a valid directory.
-        """
-        self.root_path = Path(root_path).resolve()
-        if not self.root_path.is_dir():
-            raise ValueError(f"Root path '{self.root_path}' is not a valid directory.")
+        if path.name.startswith('.'):
+             attrs |= FILE_ATTRIBUTE_HIDDEN
 
-    async def handle_request(self, request_str: str) -> str:
-        """
-        Parses a JSON request and calls the appropriate method.
-        Currently, only 'list_directory' is supported.
-        """
-        try:
-            request = json.loads(request_str)
-            method = request.get("method")
-            params = request.get("params", {})
+        if is_dir:
+            attrs |= FILE_ATTRIBUTE_DIRECTORY
+        else:
+            attrs |= FILE_ATTRIBUTE_ARCHIVE
 
-            if method == "list_directory":
-                path = params.get("path", ".")
-                return await self.list_directory(path)
-            else:
-                return self._create_error_response(f"Unknown method: {method}")
-        except json.JSONDecodeError:
-            return self._create_error_response("Invalid JSON request.")
-        except Exception as e:
-            return self._create_error_response(f"An unexpected error occurred: {e}")
-
-    async def list_directory(self, request_path: str) -> str:
-        """
-        Lists the contents of a directory in a JSON-RPC-like format.
-
-        Args:
-            request_path: The relative path from the root_path.
-
-        Returns:
-            A JSON string representing the list of files and directories,
-            or an error message.
-        """
-        try:
-            # Prevent directory traversal: resolve the path and check if it's within the root
-            target_path = (self.root_path / request_path).resolve()
-            if self.root_path not in target_path.parents and target_path != self.root_path:
-                return self._create_error_response("Access denied: Path is outside the root directory.")
-
-            if not target_path.exists():
-                return self._create_error_response(f"Path does not exist: '{request_path}'")
-
-            if not target_path.is_dir():
-                 return self._create_error_response(f"Path is not a directory: '{request_path}'")
-
-            contents = []
-            for entry in os.scandir(target_path):
-                contents.append({
-                    "name": entry.name,
-                    "path": str(Path(request_path) / entry.name),
-                    "is_dir": entry.is_dir(),
-                })
-            
-            return self._create_success_response(contents)
-
-        except Exception as e:
-            return self._create_error_response(f"Failed to list directory: {e}")
-
-    def _create_success_response(self, data):
-        return json.dumps({"status": "success", "data": data}) + "\\n"
-
-    def _create_error_response(self, message):
-        return json.dumps({"status": "error", "message": message}) + "\\n"
+        return attrs
